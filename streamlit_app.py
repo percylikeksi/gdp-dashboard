@@ -1,11 +1,11 @@
-
+%%writefile app.py
 
 
 import streamlit as st
 import pandas as pd
 
 # Data setup
-data = {"B1343020 B1343005 B1343036"
+data = {
     'item_name': [
         'Chicken Bowl', 'Chicken Burrito', 'Chips and Guacamole', 'Steak Burrito', 'Canned Soft Drink',
         'Steak Bowl', 'Chips', 'Bottled Water', 'Chicken Soft Tacos', 'Chips and Fresh Tomato Salsa',
@@ -31,7 +31,7 @@ df['category'] = df.index.map(categorize)
 food_options = df[df['category'] == 'Food'].index.tolist()
 drink_options = df[df['category'] == 'Drink'].index.tolist()
 
-st.title("🍽️ Online Menu")
+st.title("🍽️ Online Menu B1343020 B1343005 B1343036")
 
 st.subheader("Today's Specials: Chicken Bowl, Steak Burrito")
 
