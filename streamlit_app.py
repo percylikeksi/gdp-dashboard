@@ -1,151 +1,60 @@
+%%writefile app.py
+
+
 import streamlit as st
 import pandas as pd
-import math
-from pathlib import Path
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
+# Data setup
+data = {"B1343020 B1343005 B1343036"
+    'item_name': [
+        'Chicken Bowl', 'Chicken Burrito', 'Chips and Guacamole', 'Steak Burrito', 'Canned Soft Drink',
+        'Steak Bowl', 'Chips', 'Bottled Water', 'Chicken Soft Tacos', 'Chips and Fresh Tomato Salsa',
+        'Chicken Salad Bowl', 'Canned Soda', 'Side of Chips', 'Veggie Burrito', 'Barbacoa Burrito',
+        'Veggie Bowl', 'Carnitas Bowl', 'Barbacoa Bowl', 'Carnitas Burrito', 'Steak Soft Tacos'
+    ],
+    'count': [
+        726, 553, 479, 368, 301, 211, 211, 162, 115, 110, 110, 104, 101, 95, 91, 85, 68, 66, 59, 55
+    ]
+}
+df = pd.DataFrame(data)
+df.set_index('item_name', inplace=True)
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+# Categorize items
+def categorize(item):
+    if any(x in item.lower() for x in ['drink', 'water', 'soda']):
+        return 'Drink'
+    return 'Food'
 
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
+df['category'] = df.index.map(categorize)
 
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
+# Get food and drink options
+food_options = df[df['category'] == 'Food'].index.tolist()
+drink_options = df[df['category'] == 'Drink'].index.tolist()
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
+st.title("🍽️ Online Menu")
 
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
+st.subheader("Today's Specials: Chicken Bowl, Steak Burrito")
 
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
+# --- Food Selection ---
+st.subheader("🍛 Select a Food Item")
+selected_food = st.selectbox("Choose your food:", food_options)
+food_quantity = st.number_input("Quantity of food", min_value=0, max_value=10, value=0, step=1)
 
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
+# --- Drink Selection ---
 
-    return gdp_df
+st.subheader("🥤 Select a Drink Item")
+selected_drink = st.selectbox("Choose your drink:", drink_options)
+drink_quantity = st.number_input("Quantity of drink", min_value=0, max_value=10, value=0, step=1)
 
-gdp_df = get_gdp_data()
+# --- Show Order ---
+if food_quantity > 0 or drink_quantity > 0:
+    st.subheader("🧾 Order Summary")
+    summary = []
+    if food_quantity > 0:
+        summary.append({"Item": selected_food, "Quantity": food_quantity})
+    if drink_quantity > 0:
+        summary.append({"Item": selected_drink, "Quantity": drink_quantity})
+    st.table(pd.DataFrame(summary))
+else:
+    st.info("Please select quantities for food or drink to see the order summary.")
 
-# -----------------------------------------------------------------------------
-# Draw the actual page
-
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
-
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
-
-
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
-cols = st.columns(4)
-
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
-
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
-
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
